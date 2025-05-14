@@ -45,9 +45,11 @@ def create_project(name):
 
     # (Re)creating the project
     url = f"{CONFIG["gns3_server_url"]}/v2/projects"
-    data = {"name": name}
-    data_json = dumps(data)
-    response = post(url, data=data_json)
+    data = {
+        "name": name
+    }
+
+    response = post(url, data=dumps(data))
     if response.status_code == 201:
         body = response.json()
         # Adding the project ID to the config
@@ -94,9 +96,13 @@ def add_nodes():
             # Creating the node
             url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/appliances/{appliance["appliance_id"]}"
 
-            data = {"compute_id": "local", "x": instance["x"], "y": instance["y"]}
-            data_json = dumps(data)
-            response = post(url, data=data_json)
+            data = {
+                "compute_id": "local",
+                "x": instance["x"],
+                "y": instance["y"]
+            }
+
+            response = post(url, data=dumps(data))
             if response.status_code == 201:
                 instance_seq += 1
             else:
@@ -161,8 +167,7 @@ def add_links():
             ]
         }
 
-        data_json = dumps(data)
-        response = post(url, data=data_json)
+        response = post(url, data=dumps(data))
         if response.status_code != 201:
             print("Error %d when creating link %s adapter %s port %s -- %s adapter %s port %s" % \
                  (response.status_code, \
