@@ -11,6 +11,7 @@ from subprocess import call
 from time import sleep
 from re import sub
 from requests import get, post, delete
+from urllib.parse import urlparse
 from yaml import safe_dump, load
 
 
@@ -21,7 +22,7 @@ def create_project(name):
     """
 
     # Finding the project ID if a project with the given name exists.
-    url = "http://%s:%s/v2/projects" % (CONFIG["gns3_server"], CONFIG["gns3_port"])
+    url = f"{CONFIG["gns3_server_url"]}/v2/projects"
     response = get(url)
     if response.status_code == 200:
         body = response.json()
@@ -34,8 +35,8 @@ def create_project(name):
     # Deleting the project if it already exists.
     if project is not None:
         delete_project_id = project["project_id"]
-        url = "http://%s:%s/v2/projects/%s" % \
-              (CONFIG["gns3_server"], CONFIG["gns3_port"], delete_project_id)
+        url = f"{CONFIG["gns3_server_url"]}/v2/projects/{delete_project_id}"
+
         response = delete(url)
         if response.status_code != 204:
             print("Received HTTP error %d when deleting the existing project! Exiting."
@@ -43,7 +44,7 @@ def create_project(name):
             exit(1)
 
     # (Re)creating the project
-    url = "http://%s:%s/v2/projects" % (CONFIG["gns3_server"], CONFIG["gns3_port"])
+    url = f"{CONFIG["gns3_server_url"]}/v2/projects"
     data = {"name": name}
     data_json = dumps(data)
     response = post(url, data=data_json)
@@ -62,7 +63,7 @@ def assign_appliance_id():
     """
 
     node_seq = 0
-    url = "http://%s:%s/v2/appliances" % (CONFIG["gns3_server"], CONFIG["gns3_port"])
+    url = f"{CONFIG["gns3_server_url"]}/v2/appliances"
     response = get(url)
 
     if response.status_code == 200:
@@ -91,9 +92,8 @@ def add_nodes():
                                "-"  + str(instance_seq)
 
             # Creating the node
-            url = "http://%s:%s/v2/projects/%s/appliances/%s" % \
-                   (CONFIG["gns3_server"], CONFIG["gns3_port"], \
-                   CONFIG["project_id"], appliance["appliance_id"])
+            url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/appliances/{appliance["appliance_id"]}"
+
             data = {"compute_id": "local", "x": instance["x"], "y": instance["y"]}
             data_json = dumps(data)
             response = post(url, data=data_json)
@@ -107,8 +107,8 @@ def add_nodes():
     # Retrieving all nodes in the project, the assigning node IDs and console
     # port numbers by searching the node's name, then appending the config with
     # them.
-    url = "http://%s:%s/v2/projects/%s/nodes" % \
-           (CONFIG["gns3_server"], CONFIG["gns3_port"], CONFIG["project_id"])
+    url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/nodes"
+
     response = get(url)
 
     if response.status_code == 200:
@@ -136,17 +136,16 @@ def add_links():
                     if member["name"] == instance["name"]:
                         member["node_id"] = instance["node_id"]
 
-                        url = "http://%s:%s/v2/projects/%s/nodes/%s" % \
-                            (CONFIG["gns3_server"], CONFIG["gns3_port"], \
-                             CONFIG["project_id"], member["node_id"])
+                        url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/nodes/{member["node_id"]}"
+
                         response = get(url)
                         body = response.json()
 
                         member["adapter_number"] = body["ports"][member["interface"]]["adapter_number"]
                         member["port_number"] = body["ports"][member["interface"]]["port_number"]
 
-        url = "http://%s:%s/v2/projects/%s/links" % \
-               (CONFIG["gns3_server"], CONFIG["gns3_port"], CONFIG["project_id"])
+        url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/links"
+
         data = {
             "nodes": [
                {
@@ -176,8 +175,8 @@ def start_nodes():
     """
     Booting all nodes in the topology.
     """
-    url = "http://%s:%s/v2/projects/%s/nodes/start" % \
-            (CONFIG["gns3_server"], CONFIG["gns3_port"], CONFIG["project_id"])
+    url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/nodes/start"
+
     response = post(url)
     if response.status_code == 204:
         # Wait 10s for nodes to start booting
@@ -191,10 +190,13 @@ def day0_config():
     """
     Deploying Day-0 configuration
     """
+
+    gns3_server, _ = urlparse(CONFIG["gns3_server_url"]).netloc.split(':')
+
     for appliance in CONFIG["nodes"]:
         if appliance["os"] != "none":
             for instance in appliance["instances"]:
-                expect_cmd = ["expect", "day0-%s.exp" % appliance["os"], CONFIG["gns3_server"], \
+                expect_cmd = ["expect", "day0-%s.exp" % appliance["os"], gns3_server, \
                               str(instance["console"]), appliance["os"] + \
                               str(appliance["instances"].index(instance) + 1), \
                               instance["ip"], instance["gw"], ">/dev/null"]
