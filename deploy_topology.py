@@ -63,25 +63,30 @@ def create_project(name):
         exit(1)
 
 
-def assign_appliance_id():
+def assign_template_ids():
     """
-    Assigning appliance IDs to the appliance names defined in the config file.
+    Retrieve template information and assign the template IDs to the node
+    definitions. The template ID is required when creating nodes from templates.
     """
 
-    node_seq = 0
-    url = f"{CONFIG["gns3_server_url"]}/v2/appliances"
+    url = f"{CONFIG["gns3_server_url"]}/v2/templates"
     response = get(url)
 
-    if response.status_code == 200:
-        body = response.json()
-        for node in CONFIG["nodes"]:
-            node_dict = next((item for item in body if item["name"] == node["appliance_name"]), None)
-            node_appliance_id = node_dict["appliance_id"]
-            CONFIG["nodes"][node_seq]["appliance_id"] = node_appliance_id
-            node_seq += 1
-    else:
-        print("Received HTTP error %d when retrieving appliances! Exiting." % response.status_code)
+    templates = {}
+
+    if response.status_code != 200:
+        print("Received HTTP error %d when retrieving templates! Exiting." % response.status_code)
         exit(1)
+
+    body = response.json()
+    templates = { t["name"]: t["template_id"] for t in body }
+
+    for template in CONFIG["nodes"]:
+        try:
+            template["template_id"] = templates[template["template_name"]]
+        except KeyError:
+            print(f"No template '{template["template_name"]}' found on server.")
+            exit(1)
 
 
 def add_nodes():
@@ -90,18 +95,19 @@ def add_nodes():
     """
 
     # Adding nodes
-    for appliance in CONFIG["nodes"]:
+    for template in CONFIG["nodes"]:
         instance_seq = 1
-        for instance in appliance["instances"]:
+        for instance in template["instances"]:
             # Adding node name to the config
-            instance["name"] = appliance["appliance_name"].replace(" ", "") + \
+            instance["name"] = template["template_name"].replace(" ", "") + \
                                "-"  + str(instance_seq)
 
             # Creating the node
-            url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/appliances/{appliance["appliance_id"]}"
+            url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/templates/{template["template_id"]}"
 
             data = {
                 "compute_id": "local",
+                "name": instance["name"],
                 "x": instance["x"],
                 "y": instance["y"]
             }
@@ -123,8 +129,8 @@ def add_nodes():
 
     if response.status_code == 200:
         body = response.json()
-        for appliance in CONFIG["nodes"]:
-            for instance in appliance["instances"]:
+        for template in CONFIG["nodes"]:
+            for instance in template["instances"]:
                 instance["node_id"] = next((item["node_id"] \
                                     for item in body if item["name"] == instance["name"]), None)
                 instance["console"] = next((item["console"] \
@@ -141,8 +147,8 @@ def add_links():
 
     for link in CONFIG["links"]:
         for member in link:
-            for appliance in CONFIG["nodes"]:
-                for instance in appliance["instances"]:
+            for template in CONFIG["nodes"]:
+                for instance in template["instances"]:
                     if member["name"] == instance["name"]:
                         member["node_id"] = instance["node_id"]
 
@@ -202,12 +208,12 @@ def day0_config():
 
     gns3_server, _ = urlparse(CONFIG["gns3_server_url"]).netloc.split(':')
 
-    for appliance in CONFIG["nodes"]:
-        if appliance["os"] != "none":
-            for instance in appliance["instances"]:
-                expect_cmd = ["expect", "day0-%s.exp" % appliance["os"], gns3_server, \
-                              str(instance["console"]), appliance["os"] + \
-                              str(appliance["instances"].index(instance) + 1), \
+    for template in CONFIG["nodes"]:
+        if template["os"] != "none":
+            for instance in template["instances"]:
+                expect_cmd = ["expect", "day0-%s.exp" % template["os"], gns3_server, \
+                              str(instance["console"]), template["os"] + \
+                              str(template["instances"].index(instance) + 1), \
                               instance["ip"], instance["gw"], ">/dev/null"]
                 call(expect_cmd)
 
@@ -218,11 +224,11 @@ def build_ansible_hosts():
     """
 
     with open("hosts-%s" % CONFIG["project_name"], "w") as hosts_file:
-        for appliance in CONFIG["nodes"]:
-            if appliance["os"] != "none":
+        for template in CONFIG["nodes"]:
+            if template["os"] != "none":
                 # Creating inventory groups based on OS
-                hosts_file.write("[%s]\n" % appliance["os"])
-                for instance in appliance["instances"]:
+                hosts_file.write("[%s]\n" % template["os"])
+                for instance in template["instances"]:
                     # Writing the hostname and its IP address to the inventory
                     # file. The sub function reremoves the /xx or
                     # "xxx.xxx.xxx.xxx" portion of the address.
@@ -242,9 +248,9 @@ if __name__ == "__main__":
     print("Creating GNS3 project")
     create_project(CONFIG["project_name"])
 
-    # Add appliance IDs to the config
-    print("Retrieving appliance IDs")
-    assign_appliance_id()
+    # Add template IDs to the config
+    print("Retrieving template IDs")
+    assign_template_ids()
 
     # Add nodes to the topology
     print("Adding nodes")

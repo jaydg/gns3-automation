@@ -3,19 +3,19 @@ gns3_server_url: "http://10.255.255.11:3080"
 project_name: "NX-OS_mgmt_network"
 
 nodes:
-  - appliance_name: "Ethernet switch"
+  - template_name: "Ethernet switch"
     os: "none"
     instances:
       - x: 0
         y: 0
-  - appliance_name: "Cisco CSR1000v 16.7.1"
+  - template_name: "Cisco CSR1000v 16.7.1"
     os: "csr1kv"
     instances:
       - x: 0
         y: -170
         ip: "192.168.1.13 255.255.255.0"
         gw: "192.168.1.1"
-  - appliance_name: "Cisco NX-OSv 9000 7.0.3.I7.3"
+  - template_name: "Cisco NX-OSv 9000 7.0.3.I7.3"
     os: "nxos"
     instances:
       - x: -200
