@@ -6,6 +6,7 @@ them, then applies Day-0 configuration to them. It also creates an Ansible
 inventory that can be used for further configuration.
 """
 
+import argparse
 from json import dumps
 from subprocess import call
 from time import sleep
@@ -218,12 +219,12 @@ def day0_config():
                 call(expect_cmd)
 
 
-def build_ansible_hosts():
+def build_ansible_hosts(fh):
     """
     Creating an Ansible hosts file from the nodes
     """
 
-    with open("hosts-%s" % CONFIG["project_name"], "w") as hosts_file:
+    with fh as hosts_file:
         for template in CONFIG["nodes"]:
             if template["os"] != "none":
                 # Creating inventory groups based on OS
@@ -240,8 +241,31 @@ def build_ansible_hosts():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="""Create a topology on GNS3.""")
+    parser.add_argument(
+        "config_file",
+        type=argparse.FileType('r', encoding='UTF-8'),
+        help="File path of the configuration file",
+    )
+
+    parser.add_argument(
+        "--ansible-hosts",
+        type=argparse.FileType('w'),
+        help='Create Ansible hosts file for the topology',
+        required=False
+    )
+
+    parser.add_argument(
+        "--output-file",
+        type=argparse.FileType('w'),
+        help='Save final topology config into file',
+        required=False
+    )
+
+    args = parser.parse_args()
+
     # Loading config file
-    with open("topology_config.yml") as config_file:
+    with args.config_file as config_file:
         CONFIG = load(config_file, Loader=Loader)
 
     # Create project and add its ID to the config
@@ -261,13 +285,15 @@ if __name__ == "__main__":
     add_links()
 
     # Creating inventory file for Ansible
-    print("Generating Ansible inventory file")
-    build_ansible_hosts()
+    if args.ansible_hosts:
+        print("Generating Ansible inventory file")
+        build_ansible_hosts(args.ansible_hosts)
 
     # Dump final config into "topology_full.yml"
-    print("Saving final topology config.")
-    with open("topology_full.yml", 'w+') as topology_file:
-        safe_dump(CONFIG, topology_file, default_flow_style=False)
+    if args.output_file:
+        print("Saving final topology config.")
+        with args.output_file as topology_file:
+            safe_dump(CONFIG, topology_file, default_flow_style=False)
 
     # Start nodes
     print("Starting nodes")
