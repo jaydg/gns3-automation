@@ -12,7 +12,11 @@ from time import sleep
 from re import sub
 from requests import get, post, delete
 from urllib.parse import urlparse
-from yaml import safe_dump, load
+from yaml import load, safe_dump
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
 
 
 def create_project(name):
@@ -232,7 +236,7 @@ def build_ansible_hosts():
 if __name__ == "__main__":
     # Loading config file
     with open("topology_config.yml") as config_file:
-        CONFIG = load(config_file)
+        CONFIG = load(config_file, Loader=Loader)
 
     # Create project and add its ID to the config
     print("Creating GNS3 project")
