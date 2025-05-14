@@ -6,7 +6,6 @@ applies Day-0 configuration to them. It also creates an Ansible inventory that c
 used for further configuration.
 """
 
-from __future__ import print_function
 from json import dumps
 from subprocess import call
 from time import sleep
