@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 """
 This script creates a GNS3 project, adds nodes, interconnect and boots all of them, then
 applies Day-0 configuration to them. It also creates an Ansible inventory that can be
