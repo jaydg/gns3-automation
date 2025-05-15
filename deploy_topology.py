@@ -95,93 +95,94 @@ def assign_template_ids():
     body = response.json()
     templates = { t["name"]: t["template_id"] for t in body }
 
-    for template in CONFIG["nodes"]:
+    for node_name in CONFIG["nodes"]:
+        node_config = CONFIG["nodes"][node_name]
         try:
-            template["template_id"] = templates[template["template_name"]]
+            node_config["template_id"] = templates[node_config["template_name"]]
         except KeyError:
             log.error(
                 "No template '%s' found on server.",
-                template["template_name"]
+                node_config["template_name"]
             )
             exit(1)
 
 
 def add_nodes():
     """
-    This function adds a node to the project already created.
+    This function adds the defined nodes to the project.
     """
 
-    # Adding nodes
-    for template in CONFIG["nodes"]:
-        instance_seq = 1
-        for instance in template["instances"]:
-            # Adding node name to the config
-            instance["name"] = template["template_name"].replace(" ", "") + \
-                               "-"  + str(instance_seq)
+    # Add each node individually
+    for node_name in CONFIG["nodes"]:
+        node_config = CONFIG["nodes"][node_name]
 
-            # Creating the node
-            url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/templates/{template["template_id"]}"
-
-            data = {
-                "compute_id": "local",
-                "name": instance["name"],
-                "x": instance["x"],
-                "y": instance["y"]
-            }
-
-            response = post(url, data=dumps(data))
-            if response.status_code == 201:
-                instance_seq += 1
-            else:
-                log.error(
-                    "Received HTTP error %d when adding node %s! Exiting.",
-                    response.status_code,
-                    instance["name"]
-                )
-                exit(1)
-
-    # Retrieving all nodes in the project, the assigning node IDs and console
-    # port numbers by searching the node's name, then appending the config with
-    # them.
-    url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/nodes"
-
-    response = get(url)
-
-    if response.status_code == 200:
-        body = response.json()
-        for template in CONFIG["nodes"]:
-            for instance in template["instances"]:
-                instance["node_id"] = next((item["node_id"] \
-                                    for item in body if item["name"] == instance["name"]), None)
-                instance["console"] = next((item["console"] \
-                                    for item in body if item["name"] == instance["name"]), None)
-    else:
-        log.error(
-            "Received HTTP error %d when retrieving nodes! Exiting.",
-            response.status_code
+        log.debug(
+            "Node configuration for \"%s\": \"%s\"",
+            node_name,
+            node_config
         )
-        exit(1)
+
+        url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/templates/{node_config["template_id"]}"
+        data = {
+            "compute_id": "local",
+            "name": node_name,
+            "x": node_config["x"],
+            "y": node_config["y"]
+        }
+
+        log.debug("Creating node %s with data: \"%s\"", node_name, data)
+        # Create the node
+        response = post(url, data=dumps(data))
+        log.debug("Response: \"%s\"", response.json())
+
+        if response.status_code != 201:
+            log.error(
+                "Received HTTP error %d when adding node %s: \"%s\"",
+                response.status_code,
+                node_name,
+                response.json()["message"]
+            )
+            exit(1)
+
+        # Update node configuration with returned details
+        instance_data = response.json()
+        node_config["console"] = instance_data["console"]
+        node_config["node_id"] = instance_data["node_id"]
+        node_config["ports"] = instance_data["ports"]
+
+        log.debug(
+            "Updated node configuration for \"%s\": \"%s\"",
+            node_name,
+            node_config
+        )
 
 
 def add_links():
     """
-    Creating links between the nodes and their interfaces defined in the config
+    Create links between the nodes
     """
 
     for link in CONFIG["links"]:
+
+        # Add port details to links
         for member in link:
-            for template in CONFIG["nodes"]:
-                for instance in template["instances"]:
-                    if member["name"] == instance["name"]:
-                        member["node_id"] = instance["node_id"]
+            log.debug(CONFIG["nodes"])
+            log.debug("Member name: %s", member["name"])
 
-                        url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/nodes/{member["node_id"]}"
 
-                        response = get(url)
-                        body = response.json()
+            try:
+                node = CONFIG["nodes"][member["name"]]
+            except KeyError:
+                log.error(
+                    "Node \"%s\" defined in link \"%s\"does not exist.",
+                    member["name"],
+                    link
+                )
+                exit(1)
 
-                        member["adapter_number"] = body["ports"][member["interface"]]["adapter_number"]
-                        member["port_number"] = body["ports"][member["interface"]]["port_number"]
+            member["node_id"] = node["node_id"]
+            member["adapter_number"] = node["ports"][member["interface"]]["adapter_number"]
+            member["port_number"] = node["ports"][member["interface"]]["port_number"]
 
         url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/links"
 

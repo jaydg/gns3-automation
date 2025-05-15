@@ -3,43 +3,48 @@ gns3_server_url: "http://10.255.255.11:3080"
 project_name: "NX-OS_mgmt_network"
 
 nodes:
-  - template_name: "Ethernet switch"
-    os: "none"
-    instances:
-      - x: 0
-        y: 0
-  - template_name: "Cisco CSR1000v 16.7.1"
+  switch-1:
+    template_name: "Ethernet switch"
+    x: 0
+    y: 0
+
+  csr1000v-1:
+    template_name: "Cisco CSR1000v 16.7.1"
     os: "csr1kv"
-    instances:
-      - x: 0
-        y: -170
-        ip: "192.168.1.13 255.255.255.0"
-        gw: "192.168.1.1"
-  - template_name: "Cisco NX-OSv 9000 7.0.3.I7.3"
+    x: 0
+    y: -170
+    ip: "192.168.1.13 255.255.255.0"
+    gw: "192.168.1.1"
+
+  cisconx-1:
+    template_name: "Cisco NX-OSv 9000 9300v 10.1.1"
     os: "nxos"
-    instances:
-      - x: -200
-        y: 0
-        ip: "192.168.1.11/24"
-        gw: "192.168.1.1"
-      - x: 200
-        y: 0
-        ip: "192.168.1.12/24"
-        gw: "192.168.1.1"
+    x: -200
+    y: 0
+    ip: "192.168.1.11/24"
+    gw: "192.168.1.1"
+
+  cisconx-2:
+    template_name: "Cisco NX-OSv 9000 9500v 10.1.1"
+    os: "nxos"
+    x: 200
+    y: 0
+    ip: "192.168.1.12/24"
+    gw: "192.168.1.1"
 
 links:
   -
-    - name: "Ethernetswitch-1"
+    - name: "switch-1"
       interface: 1
-    - name: "CiscoNX-OSv90007.0.3.I7.3-1"
+    - name: "cisconx-1"
       interface: 0
   -
-    - name: "Ethernetswitch-1"
+    - name: "switch-1"
       interface: 2
-    - name: "CiscoNX-OSv90007.0.3.I7.3-2"
+    - name: "cisconx-2"
       interface: 0
   -
-    - name: "Ethernetswitch-1"
+    - name: "switch-1"
       interface: 3
-    - name: "CiscoCSR1000v16.7.1-1"
+    - name: "csr1000v-1"
       interface: 0
