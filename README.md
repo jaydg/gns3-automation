@@ -17,7 +17,7 @@ Based on the given configuration file, the `deploy_topology.py` Python script ma
 Then it launches Expect scripts to apply a simple Day-0 configuration (hostname, management IP address, default gateway for management). The reason Expect is used is because there is no other way to create a multi-vendor/multi-device solution.
 
 ```text
-usage: deploy_topology.py [-h] [--ansible-hosts ANSIBLE_HOSTS] [--output-file OUTPUT_FILE] config_file
+usage: deploy_topology.py [-h] [--ansible-hosts ANSIBLE_HOSTS] [--output-file OUTPUT_FILE] [-d] config_file
 
 Create a topology on GNS3.
 
@@ -30,6 +30,7 @@ options:
                         Create Ansible hosts file for the topology
   --output-file OUTPUT_FILE
                         Save final topology config into file
+  -d                    Enable debug logging
 ```
 
 Example: NX-OS supports POAP but in order to create its configuration file, we need to know its serial number. But how do we get this information for a newly created VM? We boot it, go into the console, and look up the information. But then why not configure it in that first step instead of making things complicated?

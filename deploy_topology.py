@@ -7,6 +7,9 @@ inventory that can be used for further configuration.
 """
 
 import argparse
+import logging as log
+import sys
+
 from json import dumps
 from subprocess import call
 from time import sleep
@@ -33,8 +36,10 @@ def create_project(name):
         body = response.json()
         project = next((item for item in body if item["name"] == CONFIG["project_name"]), None)
     else:
-        print("Received HTTP error %d when checking if the project already exists! Exiting." %
-              response.status_code)
+        log.error(
+            "Received HTTP error %d when checking if the project already exists! Exiting.",
+            response.status_code
+        )
         exit(1)
 
     # Deleting the project if it already exists.
@@ -44,8 +49,10 @@ def create_project(name):
 
         response = delete(url)
         if response.status_code != 204:
-            print("Received HTTP error %d when deleting the existing project! Exiting."
-                  % response.status_code)
+            log.error(
+                "Received HTTP error %d when deleting the existing project! Exiting.",
+                response.status_code
+            )
             exit(1)
 
     # (Re)creating the project
@@ -60,7 +67,10 @@ def create_project(name):
         # Adding the project ID to the config
         CONFIG["project_id"] = body["project_id"]
     else:
-        print("Received HTTP error %d when creating the project! Exiting." % response.status_code)
+        log.error(
+            "Received HTTP error %d when creating the project! Exiting.",
+            response.status_code
+        )
         exit(1)
 
 
@@ -76,7 +86,10 @@ def assign_template_ids():
     templates = {}
 
     if response.status_code != 200:
-        print("Received HTTP error %d when retrieving templates! Exiting." % response.status_code)
+        log.error(
+            "Received HTTP error %d when retrieving templates! Exiting.",
+            response.status_code
+        )
         exit(1)
 
     body = response.json()
@@ -86,7 +99,10 @@ def assign_template_ids():
         try:
             template["template_id"] = templates[template["template_name"]]
         except KeyError:
-            print(f"No template '{template["template_name"]}' found on server.")
+            log.error(
+                "No template '%s' found on server.",
+                template["template_name"]
+            )
             exit(1)
 
 
@@ -117,8 +133,11 @@ def add_nodes():
             if response.status_code == 201:
                 instance_seq += 1
             else:
-                print("Received HTTP error %d when adding node %s! Exiting." % \
-                     (response.status_code, instance["name"]))
+                log.error(
+                    "Received HTTP error %d when adding node %s! Exiting.",
+                    response.status_code,
+                    instance["name"]
+                )
                 exit(1)
 
     # Retrieving all nodes in the project, the assigning node IDs and console
@@ -137,7 +156,10 @@ def add_nodes():
                 instance["console"] = next((item["console"] \
                                     for item in body if item["name"] == instance["name"]), None)
     else:
-        print("Received HTTP error %d when retrieving nodes! Exiting." % response.status_code)
+        log.error(
+            "Received HTTP error %d when retrieving nodes! Exiting.",
+            response.status_code
+        )
         exit(1)
 
 
@@ -180,10 +202,12 @@ def add_links():
 
         response = post(url, data=dumps(data))
         if response.status_code != 201:
-            print("Error %d when creating link %s adapter %s port %s -- %s adapter %s port %s" % \
-                 (response.status_code, \
-                  link[0]["node_id"], link[0]["adapter_number"], link[0]["port_number"], \
-                  link[1]["node_id"], link[1]["adapter_number"], link[1]["port_number"]))
+            log.error(
+                "Error %d when creating link %s adapter %s port %s -- %s adapter %s port %s",
+                response.status_code,
+                link[0]["node_id"], link[0]["adapter_number"], link[0]["port_number"],
+                link[1]["node_id"], link[1]["adapter_number"], link[1]["port_number"]
+            )
             exit(1)
 
 
@@ -198,7 +222,10 @@ def start_nodes():
         # Wait 10s for nodes to start booting
         sleep(10)
     else:
-        print("Received HTTP error %d when starting nodes! Exiting." % response.status_code)
+        log.error(
+            "Received HTTP error %d when starting nodes! Exiting.",
+            response.status_code
+        )
         exit(1)
 
 
@@ -262,43 +289,57 @@ if __name__ == "__main__":
         required=False
     )
 
+    parser.add_argument(
+        "-d",
+        dest='debug',
+        action='store_true',
+        default=False,
+        help="Enable debug logging",
+    )
+
     args = parser.parse_args()
+
+    FORMAT = '%(asctime)s %(levelname)s: %(message)s'
+    if args.debug:
+        log.basicConfig(stream=sys.stderr, level=log.DEBUG, format=FORMAT)
+    else:
+        log.basicConfig(stream=sys.stderr, level=log.INFO, format=FORMAT)
 
     # Loading config file
     with args.config_file as config_file:
         CONFIG = load(config_file, Loader=Loader)
 
     # Create project and add its ID to the config
-    print("Creating GNS3 project")
+    log.info("Creating GNS3 project")
     create_project(CONFIG["project_name"])
 
     # Add template IDs to the config
-    print("Retrieving template IDs")
+    log.info("Retrieving template IDs")
     assign_template_ids()
 
     # Add nodes to the topology
-    print("Adding nodes")
+    log.info("Adding nodes")
     add_nodes()
 
     # Create links between the nodes
-    print("Adding links")
+    log.info("Adding links")
     add_links()
 
     # Creating inventory file for Ansible
     if args.ansible_hosts:
-        print("Generating Ansible inventory file")
+        log.info("Generating Ansible inventory file")
         build_ansible_hosts(args.ansible_hosts)
 
     # Dump final config into "topology_full.yml"
     if args.output_file:
-        print("Saving final topology config.")
+        log.info("Saving final topology config.")
         with args.output_file as topology_file:
             safe_dump(CONFIG, topology_file, default_flow_style=False)
 
     # Start nodes
-    print("Starting nodes")
+    log.info("Starting nodes")
     start_nodes()
 
     # Day-0 configuration
-    print("Applying Day-0 configuration")
+    log.info("Applying Day-0 configuration")
     day0_config()
