@@ -253,20 +253,36 @@ def build_ansible_hosts(fh):
     """
 
     with fh as hosts_file:
-        for template in CONFIG["nodes"]:
-            if template["os"] != "none":
-                # Creating inventory groups based on OS
-                hosts_file.write("[%s]\n" % template["os"])
-                for instance in template["instances"]:
-                    # Writing the hostname and its IP address to the inventory
-                    # file. The sub function reremoves the /xx or
-                    # "xxx.xxx.xxx.xxx" portion of the address.
-                    hosts_file.write(
-                        "%s ansible_host=%s\n" % \
-                        (instance["name"], sub("/.*$| .*$", "", instance["ip"]))
-                    )
-                hosts_file.write("\n")
+        ansible_groups = {}
 
+        for node, config in CONFIG["nodes"].items():
+            if not "ip" in config:
+                continue
+
+            # Writing the hostname and its IP address to the inventory
+            # file. The sub function removes the /xx or
+            # "xxx.xxx.xxx.xxx" portion of the address.
+            hosts_file.write(
+                f"{node} ansible_host={sub("/.*$| .*$", "", config["ip"])}\n"
+            )
+
+            if not "groups" in config:
+                continue
+
+            for group in config["groups"]:
+                if group not in ansible_groups:
+                    ansible_groups[group] = [node]
+                else:
+                    ansible_groups[group].append(node)
+
+            log.debug("Gathered groups: %s", ansible_groups)
+
+        # Create inventory groups
+        for group, hosts in ansible_groups.items():
+            hosts_file.write("\n")
+            hosts_file.write(f"[{group}]\n")
+            for host in hosts:
+                hosts_file.write(f"{host}\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="""Create a topology on GNS3.""")
