@@ -237,14 +237,19 @@ def day0_config():
 
     gns3_server, _ = urlparse(CONFIG["gns3_server_url"]).netloc.split(':')
 
-    for template in CONFIG["nodes"]:
-        if template["os"] != "none":
-            for instance in template["instances"]:
-                expect_cmd = ["expect", "day0-%s.exp" % template["os"], gns3_server, \
-                              str(instance["console"]), template["os"] + \
-                              str(template["instances"].index(instance) + 1), \
-                              instance["ip"], instance["gw"], ">/dev/null"]
-                call(expect_cmd)
+    for node_name, config in CONFIG["nodes"].items():
+        if "cmdfile" in config:
+            expect_cmd = [
+                "expect",
+                f"day0-{config["cmdfile"]}.exp",
+                gns3_server,
+                str(config["console"]),
+                node_name,
+                config["ip"],
+                config["gw"],
+                ">/dev/null"
+            ]
+            call(expect_cmd)
 
 
 def build_ansible_hosts(fh):

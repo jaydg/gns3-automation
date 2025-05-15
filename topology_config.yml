@@ -10,7 +10,7 @@ nodes:
 
   csr1000v-1:
     template_name: "Cisco CSR1000v 16.7.1"
-    os: "csr1kv"
+    cmdfile: "csr1kv"
     x: 0
     y: -170
     ip: "192.168.1.13 255.255.255.0"
@@ -18,7 +18,7 @@ nodes:
 
   cisconx-1:
     template_name: "Cisco NX-OSv 9000 9300v 10.1.1"
-    os: "nxos"
+    cmdfile: "nxos"
     x: -200
     y: 0
     ip: "192.168.1.11/24"
@@ -26,7 +26,7 @@ nodes:
 
   cisconx-2:
     template_name: "Cisco NX-OSv 9000 9500v 10.1.1"
-    os: "nxos"
+    cmdfile: "nxos"
     x: 200
     y: 0
     ip: "192.168.1.12/24"
