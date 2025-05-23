@@ -298,6 +298,19 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "-s",
+        dest='gns3_server_url',
+        help='GNS3 server URL (e.g. http://10.0.0.10:3080/)',
+        required=False
+    )
+
+    parser.add_argument(
+        "--project-name",
+        help='GNS3 project name',
+        required=False
+    )
+
+    parser.add_argument(
         "--ansible-hosts",
         type=argparse.FileType('w'),
         help='Create Ansible hosts file for the topology',
@@ -330,6 +343,13 @@ if __name__ == "__main__":
     # Loading config file
     with args.config_file as config_file:
         CONFIG = load(config_file, Loader=Loader)
+
+    # overwrite some definitions from the configuration file
+    if args.gns3_server_url:
+        CONFIG["gns3_server_url"] = args.gns3_server_url
+
+    if args.project_name:
+        CONFIG["project_name"] = args.project_name
 
     # Create project and add its ID to the config
     log.info("Creating GNS3 project")
