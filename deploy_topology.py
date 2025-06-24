@@ -7,14 +7,18 @@ inventory that can be used for further configuration.
 """
 
 import argparse
+import atexit
 import logging as log
+import pycdlib
+import shutil
 import sys
+import tempfile
 
 from json import dumps
 from subprocess import call
 from time import sleep
 from re import sub
-from requests import get, post, delete
+from requests import get, post, put, delete
 from urllib.parse import urlparse
 from yaml import load, safe_dump
 try:
@@ -106,6 +110,47 @@ def assign_template_ids():
             )
             exit(1)
 
+def create_cloud_config(node_name):
+    """
+    Create cloud config files, i.e. the cloud-init configuration and an iso
+    image containing those files.
+    """
+    log.debug("Creating cloud config for %s", node_name)
+    tmpdir = tempfile.mkdtemp()
+    log.debug("Created temporary directory '%s' for %s", tmpdir, node_name)
+    fn = f"{tmpdir}/network-config"
+    with open(fn, "w") as conffile:
+        config = (
+            "network:\n"
+            "  version: 2\n"
+            "  ethernets:\n"
+            "    ens3:\n"
+            "      dhcp4: false\n"
+            "      dhcp6: false\n"
+            "      addresses:\n"
+           f"        - \"{CONFIG["nodes"][node_name]['ip']}\"\n"
+            "      routes:\n"
+            "        - to: default\n"
+           f"          via: \"{CONFIG["nodes"][node_name]['gw']}\"\n"
+            "      nameservers:\n"
+            "        addresses:\n"
+            "          - 9.9.9.9\n"
+            "          - 1.1.1.1\n"
+        )
+        conffile.write(config)
+
+    iso_name = f"{tmpdir}/{node_name}.iso"
+    log.debug("Create cloud-init iso for %s: '%s'", node_name)
+    iso = pycdlib.PyCdlib()
+    iso.new(vol_ident='cidata', udf='2.60')
+    iso.add_file(fn, udf_path="/network-config")
+    iso.write(iso_name)
+    iso.close()
+
+    # ensure the stuff gets deleted when the program exits
+    atexit.register(shutil.rmtree, tmpdir)
+
+    return iso_name
 
 def add_nodes():
     """
@@ -149,6 +194,26 @@ def add_nodes():
         node_config["console"] = instance_data["console"]
         node_config["node_id"] = instance_data["node_id"]
         node_config["ports"] = instance_data["ports"]
+
+        if 'cloud_init' in node_config:
+            iso_name = create_cloud_config(node_name)
+            data["properties"] = {
+                "cdrom_image": iso_name
+            }
+
+            log.debug("Uploading cloud-init ISO image for node %s: ", node_name)
+
+            url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/nodes/{node_config["node_id"]}"
+            response = put(url, data=dumps(data))
+
+            if response.status_code != 200:
+                log.error(
+                    "Received HTTP error %d when uploading cloud-init image for node %s: \"%s\"",
+                    response.status_code,
+                    node_name,
+                    response.json()["message"]
+                )
+                exit(1)
 
         log.debug(
             "Updated node configuration for \"%s\": \"%s\"",
@@ -343,6 +408,10 @@ if __name__ == "__main__":
     # Loading config file
     with args.config_file as config_file:
         CONFIG = load(config_file, Loader=Loader)
+
+    # FIXME: ensure shutils.rmtree doesn't kill the working directory
+    import os
+    os.chdir("/tmp/run_gns3a")
 
     # overwrite some definitions from the configuration file
     if args.gns3_server_url:
