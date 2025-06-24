@@ -372,7 +372,7 @@ if __name__ == "__main__":
         log.info("Generating Ansible inventory file")
         build_ansible_hosts(args.ansible_hosts)
 
-    # Dump final config into "topology_full.yml"
+    # Dump final config
     if args.output_file:
         log.info("Saving final topology config.")
         with args.output_file as topology_file:
