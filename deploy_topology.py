@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+# pylint: disable=line-too-long
+
 """
 This script creates a GNS3 project, adds nodes, interconnect and boots all of
 them, then applies Day-0 configuration to them. It also creates an Ansible
@@ -7,9 +9,14 @@ inventory that can be used for further configuration.
 """
 
 import argparse
+import atexit
 import logging as log
+import pycdlib
+import shutil
 import sys
+import tempfile
 
+from jinja2 import Template
 from json import dumps
 from subprocess import call
 from time import sleep
@@ -114,6 +121,83 @@ def assign_template_ids():
             )
             exit(1)
 
+_network_config_tpl = """## template: jinja
+network:
+  version: 2
+  ethernets:
+    ens3:
+      dhcp4: false
+      dhcp6: false
+      addresses:
+        - "{{ node_config["ip"] }}"
+      routes:
+        - to: default
+          via: "{{ node_config["gw"] }}"
+{%- if "nameservers" in defaults %}
+      nameservers:
+        addresses:
+{%- for nameserver in defaults["nameservers"] %}
+          - "{{ nameserver -}}"
+{% endfor %}
+{% endif %}
+"""
+
+_user_data_tpl = """#cloud-config
+password: ubuntu
+chpasswd: { expire: False }
+ssh_pwauth: True
+
+"""
+
+_meta_data_tpl = """instance-id: {{ node_name }}
+local-hostname: {{ node_name }}
+
+"""
+
+def create_cloud_config(node_name):
+    """
+    Create cloud config files, i.e. the cloud-init configuration and an iso
+    image containing those files.
+    """
+    log.debug("Creating cloud config for %s", node_name)
+    tmpdir = tempfile.mkdtemp()
+    log.debug("Created temporary directory '%s' for %s", tmpdir, node_name)
+
+    tpl_data = {
+        "node_name": node_name,
+        "node_config": CONFIG["nodes"][node_name],
+        "defaults": CONFIG["defaults"],
+    }
+
+    network_config = f"{tmpdir}/network-config"
+    with open(network_config, "w") as conffile:
+        nctpl = Template(_network_config_tpl)
+        conffile.write(nctpl.render(tpl_data))
+
+    user_config = f"{tmpdir}/user-data"
+    with open(user_config, "w") as conffile:
+        udtpl = Template(_user_data_tpl)
+        conffile.write(udtpl.render(tpl_data))
+
+    meta_data = f"{tmpdir}/meta-data"
+    with open(meta_data, "w") as conffile:
+        udtpl = Template(_meta_data_tpl)
+        conffile.write(udtpl.render(tpl_data))
+
+    iso_name = f"{tmpdir}/{node_name}.iso"
+    log.debug("Create cloud-init iso for %s: '%s'", node_name, iso_name)
+    iso = pycdlib.PyCdlib()
+    iso.new(vol_ident='cidata', joliet=3, rock_ridge="1.09")
+    iso.add_file(network_config, joliet_path="/network-config")
+    iso.add_file(user_config, joliet_path="/user-data")
+    iso.add_file(meta_data, joliet_path="/meta-data")
+    iso.write(iso_name)
+    iso.close()
+
+    # ensure the stuff gets deleted when the program exits
+    atexit.register(shutil.rmtree, tmpdir)
+
+    return iso_name
 
 def add_nodes():
     """
@@ -157,6 +241,42 @@ def add_nodes():
         node_config["console"] = instance_data["console"]
         node_config["node_id"] = instance_data["node_id"]
         node_config["ports"] = instance_data["ports"]
+        node_config["node_directory"] = instance_data["node_directory"]
+
+        if 'cloud_init' in node_config:
+            iso_name = create_cloud_config(node_name)
+
+            log.debug("Uploading cloud-init ISO image for node %s: ", node_name)
+            url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/nodes/{node_config["node_id"]}/files/cloud-init.iso"
+            with open(iso_name, 'rb') as iso_file:
+                response = post(url, data=iso_file)
+
+                if response.status_code != 201:
+                    log.error(
+                        "Received HTTP error %d when uploading cloud-init image for node %s: \"%s\"",
+                        response.status_code,
+                        node_name,
+                        response.text
+                    )
+                    exit(1)
+
+
+            log.debug("Configuring cloud-init ISO image for node %s: ", node_name)
+            data["properties"] = {
+                "cdrom_image": f"{node_config["node_directory"]}/cloud-init.iso"
+            }
+
+            url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/nodes/{node_config["node_id"]}"
+            response = put(url, data=dumps(data))
+
+            if response.status_code != 200:
+                log.error(
+                    "Received HTTP error %d when configuring cloud-init image for node %s: \"%s\"",
+                    response.status_code,
+                    node_name,
+                    response.json()["message"]
+                )
+                exit(1)
 
         log.debug(
             "Updated node configuration for \"%s\": \"%s\"",

@@ -1,0 +1,68 @@
+project_name: "ubuntu_cloud_init"
+
+defaults:
+  nameservers:
+    - "1.1.1.1"
+    - "9.9.9.9"
+
+nodes:
+  cloud1:
+    template_name: "Cloud"
+    x: 0
+    y: -200
+
+  switch-01:
+    template_name: "Ethernet switch"
+    x: 0
+    y: 0
+
+  srv-01:
+    groups:
+      - redis
+      - galera
+    template_name: "Ubuntu Cloud Guest Ubuntu 24.04 LTS (Noble Numbat)"
+    cloud_init: true
+    x: -200
+    y: 200
+    ip: "192.168.1.11/24"
+    gw: "192.168.1.1"
+
+  srv-02:
+    groups:
+      - redis
+      - galera
+    template_name: "Ubuntu Cloud Guest Ubuntu 24.04 LTS (Noble Numbat)"
+    cloud_init: true
+    x: 0
+    y: 200
+    ip: "192.168.1.12/24"
+    gw: "192.168.1.1"
+
+  srv-03:
+    groups:
+      - redis
+      - galera
+    template_name: "Ubuntu Cloud Guest Ubuntu 24.04 LTS (Noble Numbat)"
+    cloud_init: true
+    x: 200
+    y: 200
+    ip: "192.168.1.13/24"
+    gw: "192.168.1.1"
+
+links:
+  - - name: "switch-01"
+      interface: 0
+    - name: "srv-01"
+      interface: 0
+  - - name: "switch-01"
+      interface: 1
+    - name: "srv-02"
+      interface: 0
+  - - name: "switch-01"
+      interface: 2
+    - name: "srv-03"
+      interface: 0
+  - - name: switch-01
+      interface: 7
+    - name: cloud1
+      interface: 1
