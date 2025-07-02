@@ -17,7 +17,7 @@ Based on the given configuration file, the `deploy_topology.py` Python script ma
 Then it launches Expect scripts to apply a simple Day-0 configuration (hostname, management IP address, default gateway for management). The reason Expect is used is because there is no other way to create a multi-vendor/multi-device solution.
 
 ```text
-usage: deploy_topology.py [-h] [--ansible-hosts ANSIBLE_HOSTS] [--output-file OUTPUT_FILE] [-d] config_file
+usage: deploy_topology.py [-h] [-s GNS3_SERVER_URL] [--project-name PROJECT_NAME] [--ansible-hosts ANSIBLE_HOSTS] [--output-file OUTPUT_FILE] [-d] config_file
 
 Create a topology on GNS3.
 
@@ -26,6 +26,9 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
+  -s GNS3_SERVER_URL    GNS3 server URL (e.g. http://10.0.0.10:3080/)
+  --project-name PROJECT_NAME
+                        GNS3 project name
   --ansible-hosts ANSIBLE_HOSTS
                         Create Ansible hosts file for the topology
   --output-file OUTPUT_FILE
