@@ -30,7 +30,15 @@ def create_project(name):
     """
 
     # Finding the project ID if a project with the given name exists.
-    url = f"{CONFIG["gns3_server_url"]}/v2/projects"
+    try:
+        url = f"{CONFIG["gns3_server_url"]}/v2/projects"
+    except KeyError:
+        print(
+            "Please specify the GNS3 server URL either in the configuration file or on the command line",
+            file=sys.stderr
+        )
+        exit(1)
+
     response = get(url)
     if response.status_code == 200:
         body = response.json()
