@@ -146,7 +146,12 @@ _user_data_tpl = """#cloud-config
 password: ubuntu
 chpasswd: { expire: False }
 ssh_pwauth: True
-
+{%- if "ssh_authorized_keys" in defaults %}
+ssh_authorized_keys:
+{%- for ssh_key in defaults["ssh_authorized_keys"] %}
+    - "{{ ssh_key -}}"
+{% endfor %}
+{% endif %}
 """
 
 _meta_data_tpl = """instance-id: {{ node_name }}

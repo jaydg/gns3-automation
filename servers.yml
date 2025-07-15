@@ -4,6 +4,8 @@ defaults:
   nameservers:
     - "1.1.1.1"
     - "9.9.9.9"
+  ssh_authorized_keys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGV8GKKyr2sZNjq4AnbTWhe7Z4lQa+8QAZia8j7NAbBK example_key
 
 nodes:
   cloud1:
