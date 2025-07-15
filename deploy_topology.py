@@ -21,7 +21,7 @@ from json import dumps
 from subprocess import call
 from time import sleep
 from re import sub
-from requests import get, post, delete
+from requests import delete, get, post, put
 from urllib.parse import urlparse
 from yaml import load, safe_dump
 try:
