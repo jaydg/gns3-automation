@@ -48,6 +48,7 @@ This video shows the script in action: [https://www.youtube.com/watch?v=6UnkgeiM
   are required on your system:
   - jinja2
   - pycdlib
+  - PyYAML
   - requests
 - Make sure the device names in the links section of the config file matches your configured settings. By default GNS3 uses {name}-{0}, which is translated to the appliances' name without spaces, followed by a dash and a sequence number.
 
