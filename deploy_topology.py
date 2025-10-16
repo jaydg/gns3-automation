@@ -248,6 +248,28 @@ def add_nodes():
         node_config["ports"] = instance_data["ports"]
         node_config["node_directory"] = instance_data["node_directory"]
 
+        if 'adapters' in node_config:
+            log.debug("Configuring number of adapters node %s: ", node_name)
+            data["properties"] = {
+                "adapters": node_config["adapters"],
+            }
+
+            url = f"{CONFIG["gns3_server_url"]}/v2/projects/{CONFIG["project_id"]}/nodes/{node_config["node_id"]}"
+            response = put(url, data=dumps(data))
+
+            if response.status_code != 200:
+                log.error(
+                    "Received HTTP error %d when configuring adapters for node %s: \"%s\"",
+                    response.status_code,
+                    node_name,
+                    response.json()["message"]
+                )
+                exit(1)
+
+            # Update node configuration with returned details
+            instance_data = response.json()
+            node_config["ports"] = instance_data["ports"]
+
         if 'cloud_init' in node_config:
             iso_name = create_cloud_config(node_name)
 
