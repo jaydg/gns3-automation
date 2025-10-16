@@ -379,9 +379,11 @@ def day0_config():
                 str(config["console"]),
                 node_name,
                 config["ip"],
-                config["gw"],
-                ">/dev/null"
+                config["gw"]
             ]
+
+            log.debug("Running '%s'", expect_cmd)
+
             call(expect_cmd)
 
 
