@@ -16,10 +16,11 @@ import shutil
 import sys
 import tempfile
 
+from concurrent.futures import ThreadPoolExecutor, wait
 from jinja2 import Template
 from json import dumps
-from subprocess import call
 from time import sleep
+from subprocess import Popen
 from re import sub
 from requests import delete, get, post, put
 from urllib.parse import urlparse
@@ -404,6 +405,21 @@ def start_nodes():
         )
         exit(1)
 
+def applay_day0_config(node_name, config, gns3_server):
+    expect_cmd = [
+        "expect",
+        f"day0-{config["cmdfile"]}.exp",
+        gns3_server,
+        str(config["console"]),
+        node_name,
+        config["ip"],
+        config["gw"]
+    ]
+
+    log.debug("Running '%s'", expect_cmd)
+
+    process = Popen(expect_cmd)
+    process.communicate()
 
 def day0_config():
     """
@@ -412,22 +428,19 @@ def day0_config():
 
     gns3_server, _ = urlparse(CONFIG["gns3_server_url"]).netloc.split(':')
 
-    for node_name, config in CONFIG["nodes"].items():
-        if "cmdfile" in config:
-            expect_cmd = [
-                "expect",
-                f"day0-{config["cmdfile"]}.exp",
-                gns3_server,
-                str(config["console"]),
-                node_name,
-                config["ip"],
-                config["gw"]
-            ]
+    with ThreadPoolExecutor() as executor:
+        futures = set()
 
-            log.debug("Running '%s'", expect_cmd)
+        for node_name, config in CONFIG["nodes"].items():
 
-            call(expect_cmd)
+            if not "cmdfile" in config:
+                continue
 
+            futures.add(
+                executor.submit(applay_day0_config, node_name, config, gns3_server)
+            )
+
+        wait(futures)
 
 def build_ansible_hosts(fh):
     """
