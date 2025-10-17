@@ -1,0 +1,51 @@
+set gns3_host [lindex $argv 0];
+set port [lindex $argv 1];
+set hostname [lindex $argv 2];
+set mgmt_ip [lindex $argv 3];
+set mgmt_gw [lindex $argv 4];
+
+set prompt "cumulus@cumulus:mgmt:~$ "
+set old_password "cumulus"
+set new_password "Passw0rd!"
+set timeout 600
+log_user 0
+
+spawn telnet $gns3_host $port
+
+expect "cumulus login:"
+send "cumulus\n"
+
+expect "Password:"
+send "$old_password\n"
+
+# Set new passwor
+expect "Current password:"
+send "$old_password\n"
+
+expect "New password:"
+send "$new_password\n"
+
+expect "Retype new password:"
+send "$new_password\n"
+
+# Configure mgmt interface
+expect "$prompt"
+send "nv unset interface eth0 ip address dhcp\n"
+
+expect "$prompt"
+send "nv set interface eth0 ip address $mgmt_ip\n"
+
+expect "$prompt"
+send "nv set interface eth0 ip gateway $mgmt_gw\n"
+
+expect "$prompt"
+send "nv set system hostname $hostname\n"
+
+expect "$prompt"
+send "nv config apply\n"
+
+expect "Are you sure? "
+send "y\n"
+
+expect "$prompt"
+send "exit\n"
